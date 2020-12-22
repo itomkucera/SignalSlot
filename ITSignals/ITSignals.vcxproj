@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\ITSignals.cpp" />
+    <ClCompile Include="src\ITSignalsDemo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\ITSignals.h" />

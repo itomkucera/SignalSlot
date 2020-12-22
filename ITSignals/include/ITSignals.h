@@ -1,3 +1,6 @@
+#ifndef __ITSIGNALS_H__
+#define __ITSIGNALS_H__
+
 #include <functional>
 #include <map>
 #include <memory>
@@ -127,3 +130,4 @@ private:
 };
 
 
+#endif // __ITSIGNALS_H__
