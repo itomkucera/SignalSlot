@@ -6,6 +6,7 @@
 #include <memory>
 #include <utility>
 #include <type_traits>
+#include <assert.h>
 
 // IMPLEMENTATION DETAILS
 namespace itom::detail
@@ -145,6 +146,9 @@ public:
     size_t Connect(S&& slot, D* disconnector,
         typename std::enable_if<std::is_base_of<Disconnector, D>::value>::type* = nullptr)
     {
+        //  TODO: deal with this in a proper way; maybe return an empty connection?
+        assert(disconnector);
+
         // create a connection and pass it to the disconnector
         connections_.emplace_back(
             std::make_shared<detail::Connection>(actual_slot_id_, *this));
@@ -166,13 +170,13 @@ public:
 
     }
 
-    //// creates a connection with a reference to the disconnector
-    //// and stores the slot inside the signal    
-    //template <typename S, typename D>
-    //size_t Connect(S&& slot, D&& disconnector)
-    //{
-    //    return Connect(std::forward<S>(slot), std::addressof(disconnector));
-    //}
+    // creates a connection with a reference to the disconnector
+    // and stores the slot inside the signal    
+    template <typename S, typename D>
+    size_t Connect(S&& slot, D& disconnector)
+    {
+        return Connect(std::forward<S>(slot), std::addressof(disconnector));
+    }
 
     // emit the signal - call all the connected slots
     template <typename... EmitArgs>
