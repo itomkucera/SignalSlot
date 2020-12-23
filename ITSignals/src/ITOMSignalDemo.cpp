@@ -13,7 +13,7 @@ struct Widget : public itom::Disconnector
     Widget(const std::string& name) :
         name_{ name }
     {
-        // notify when the widget gains focus
+        // notify when the widget gains a focus
         focus_in_.Connect([this]() {
             std::cout << name_  << " widget: focus received\n";
         });
@@ -76,10 +76,24 @@ int main()
         w // w's dtor makes this slot to be disconnected
     );
 
-    // itom::Disconnector's virtual dtor disconnects the above created connection
+    // itom::Disconnector's virtual dtor terminates the above created connection
     delete w;
 
-    // this should not crash; execute only 1 signal
+    size_t discon_slot_id = listbox->focus_in_.Connect([]() {
+        std::cout << "don't print this\n";
+    });
+    
+    // explicitly terminate a connection
+    listbox->focus_in_.Disconnect(discon_slot_id);
+
+    // multiple connections to the same signal
+    listbox->focus_in_.Connect([]() {
+        std::cout << "multiple slot test passed\n";
+    });
+
+    // this should execute 2 slots - 4 were connected
+    // 1 was disconnected automatically (by Disconnector's dtor)
+    // 1 was disconnected explicitly using Signal::Disconnect()
     listbox->focus_in_.Emit(); 
 
     // test the multi-param signal

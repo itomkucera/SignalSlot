@@ -1,15 +1,18 @@
-#ifndef __ITSIGNALS_H__
-#define __ITSIGNALS_H__
+#ifndef __ITOMSIGNAL_H__
+#define __ITOMSIGNAL_H__
 
 #include <functional>
 #include <map>
 #include <memory>
 #include <utility>
 
-// TODO: hide the implementation, expose only necessary parts
-
-namespace itomdetail
+namespace itom
 {
+
+// hide the implementation details in the detail namespace
+namespace detail
+{
+
 struct SignalBase
 {
     virtual void Disconnect(size_t slot_id) = 0;
@@ -27,10 +30,10 @@ struct Connection
     size_t slot_id_;
     SignalBase& signal_;
 };
-}
 
-namespace itom
-{
+} // namespace detail
+
+
 /*
 * If any class extends from Disconnector, all the connections
 * that depend on the instance of this class (this object was declared
@@ -39,7 +42,7 @@ namespace itom
 */
 class Disconnector
 {
-    using WeakPtrConnection = std::weak_ptr<itomdetail::Connection>;
+    using WeakPtrConnection = std::weak_ptr<detail::Connection>;
     using WeakPtrConnectionContainer = std::vector<WeakPtrConnection>;
 
 public:
@@ -68,18 +71,20 @@ private:
         connections_.push_back(connection);
     }
 
+    // weak_ptr to connections - they may already be terminated
+    // due to the signal desctruction
     WeakPtrConnectionContainer connections_;
 };
 
 
 
 template <typename... Args>
-class Signal : public itomdetail::SignalBase
+class Signal : public detail::SignalBase
 {
     using SlotType = std::function<void(Args...)>;
     using SlotContainer = std::map<size_t, SlotType>;
 
-    using SharedPtrConnection = std::shared_ptr<itomdetail::Connection>;
+    using SharedPtrConnection = std::shared_ptr<detail::Connection>;
     using SharedPtrConnectionContainer = std::vector<SharedPtrConnection>;
 
 public:
@@ -103,19 +108,19 @@ public:
     template <typename S>
     size_t Connect(S&& slot)
     {
-        slots_.emplace(actual_id_, std::forward<S>(slot));
-        return actual_id_++;
+        slots_.emplace(actual_slot_id_, std::forward<S>(slot));
+        return actual_slot_id_++;
     }
 
     // create a connection with a pointer to the disconnector
     template <typename S>
     size_t Connect(S&& slot, Disconnector* disconnector)
     {
-        // TODO: member function
-        slots_.emplace(actual_id_, std::forward<S>(slot));
-        connections_.emplace_back(std::make_shared<itomdetail::Connection>(actual_id_, *this));
+        connections_.emplace_back(
+            std::make_shared<detail::Connection>(actual_slot_id_, *this));
         disconnector->AddConnection(connections_.back());
-        return actual_id_++;
+
+        return Connect(std::forward<S>(slot));
     }
 
     // create a connection with a reference to the disconnector
@@ -139,7 +144,7 @@ public:
 
 private:
     // slot id counter
-    size_t actual_id_ = 0;
+    size_t actual_slot_id_ = 0;
 
     // keep track of the connections to prevent the disconnector
     // from trying to terminate a non-existing connection
@@ -148,7 +153,8 @@ private:
     // connected slots
     SlotContainer slots_;
 };
-}
+
+} // namespace itom
 
 
-#endif // __ITSIGNALS_H__
+#endif // __ITOMSIGNAL_H__
