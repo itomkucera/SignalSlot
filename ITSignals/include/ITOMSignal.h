@@ -6,34 +6,57 @@
 #include <memory>
 #include <utility>
 
-namespace itom
+// IMPLEMENTATION DETAILS
+namespace itom::detail
 {
 
-// hide the implementation details in the detail namespace
-namespace detail
+/*
+* Signal's interface used as a "forward declaration"
+*/
+class ISignal
 {
+public:
 
-struct SignalBase
-{
     virtual void Disconnect(size_t slot_id) = 0;
 };
 
-struct Connection
+/* 
+* Connection class carries information about the signal and
+* slot's position inside the signal
+*/ 
+class Connection final
 {
-    Connection(size_t slot_id, SignalBase& signal) :
+public:
+
+    Connection(size_t slot_id, ISignal& signal) :
         slot_id_{ slot_id },
         signal_{ signal }
     {
-
+        
     }
 
+    size_t GetSlotID() const
+    {
+        return slot_id_;
+    }
+
+    ISignal& GetSignal() const
+    {
+        return signal_;
+    }
+
+private:
+
     size_t slot_id_;
-    SignalBase& signal_;
+    ISignal& signal_;
 };
 
-} // namespace detail
+} // namespace itom::detail
 
 
+// PUBLIC API
+namespace itom
+{
 /*
 * If any class extends from Disconnector, all the connections
 * that depend on the instance of this class (this object was declared
@@ -59,7 +82,7 @@ public:
             // that are still active - prevents from a crash
             if (auto shared_con = weak_con.lock())
             {
-                shared_con->signal_.Disconnect(shared_con->slot_id_);
+                shared_con->GetSignal().Disconnect(shared_con->GetSlotID());
             }
         }
     }
@@ -79,7 +102,7 @@ private:
 
 
 template <typename... Args>
-class Signal : public detail::SignalBase
+class Signal : public detail::ISignal
 {
     using SlotType = std::function<void(Args...)>;
     using SlotContainer = std::map<size_t, SlotType>;
@@ -104,26 +127,32 @@ public:
         slots_.erase(slot_id);
     }
 
-    // create a connection without a disconnector
+    // stores the slot inside the signal
     template <typename S>
     size_t Connect(S&& slot)
     {
+        // store the slot at the actual position
         slots_.emplace(actual_slot_id_, std::forward<S>(slot));
+        // return this  position and increse the counter
         return actual_slot_id_++;
     }
 
-    // create a connection with a pointer to the disconnector
+    // creates a connection with a pointer to the disconnector
+    // and stores the slot inside the signal
     template <typename S>
     size_t Connect(S&& slot, Disconnector* disconnector)
     {
+        // create a connection and pass it to the disconnector
         connections_.emplace_back(
             std::make_shared<detail::Connection>(actual_slot_id_, *this));
         disconnector->AddConnection(connections_.back());
 
+        // store the slot and return its position
         return Connect(std::forward<S>(slot));
     }
 
-    // create a connection with a reference to the disconnector
+    // creates a connection with a reference to the disconnector
+    // and stores the slot inside the signal    
     template <typename S>
     size_t Connect(S&& slot, Disconnector& disconnector)
     {
