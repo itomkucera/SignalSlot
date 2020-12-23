@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.1321
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ITSignals", "ITSignals\ITSignals.vcxproj", "{A0BB494C-D798-492D-A201-C128A71BAAF7}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SignalSlot", "SignalSlot.vcxproj", "{A0BB494C-D798-492D-A201-C128A71BAAF7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

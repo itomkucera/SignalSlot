@@ -3,7 +3,7 @@
 #include <vector>
 
 // signals header
-#include "ITOMSignal.h"
+#include "itomsignal.h"
 
 /*
 * Dummy struct extending the Disconnector class - see the ITSignals.h
