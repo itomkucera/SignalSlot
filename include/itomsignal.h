@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <utility>
+#include <type_traits>
 
 // IMPLEMENTATION DETAILS
 namespace itom::detail
@@ -140,8 +141,9 @@ public:
 
     // creates a connection with a pointer to the disconnector
     // and stores the slot inside the signal
-    template <typename S>
-    size_t Connect(S&& slot, Disconnector* disconnector)
+    template <typename S,  typename D>
+    size_t Connect(S&& slot, D* disconnector,
+        typename std::enable_if<std::is_base_of<Disconnector, D>::value>::type* = nullptr)
     {
         // create a connection and pass it to the disconnector
         connections_.emplace_back(
@@ -149,16 +151,28 @@ public:
         disconnector->AddConnection(connections_.back());
 
         // store the slot and return its position
-        return Connect(std::forward<S>(slot));
+        if constexpr (std::is_invocable<decltype(slot)>::value)
+        {
+            // invocable by itself
+            return Connect(std::forward<S>(slot));
+        }
+        else
+        {
+            // probably a non-static member function pointer - bind it
+            return Connect([&](Args&&... args) {
+                (disconnector->*slot)(std::forward<Args>(args)...);
+            });
+        }
+
     }
 
-    // creates a connection with a reference to the disconnector
-    // and stores the slot inside the signal    
-    template <typename S>
-    size_t Connect(S&& slot, Disconnector& disconnector)
-    {
-        return Connect(std::forward<S>(slot), std::addressof(disconnector));
-    }
+    //// creates a connection with a reference to the disconnector
+    //// and stores the slot inside the signal    
+    //template <typename S, typename D>
+    //size_t Connect(S&& slot, D&& disconnector)
+    //{
+    //    return Connect(std::forward<S>(slot), std::addressof(disconnector));
+    //}
 
     // emit the signal - call all the connected slots
     template <typename... EmitArgs>

@@ -6,10 +6,12 @@
 #include "itomsignal.h"
 
 /*
-* Dummy struct extending the Disconnector class - see the ITSignals.h
+* Dummy class extending the Disconnector class - see the ITSignals.h
 */
-struct Widget : public itom::Disconnector
+class Widget : public itom::Disconnector
 {
+public:
+
     Widget(const std::string& name) :
         name_{ name }
     {
@@ -24,6 +26,11 @@ struct Widget : public itom::Disconnector
         return name_;
     }
 
+    void PrintName() const
+    {
+        std::cout << name_ << "\n";
+    }
+
     // simple focus signal without a param
     itom::Signal<> focus_in_;
 
@@ -36,8 +43,10 @@ protected:
 /*
 * Another dummy class higher in the hierarchy
 */
-struct ListBox : public Widget
+class ListBox : public Widget
 {
+public:
+
     ListBox(const std::string& name) :
         Widget(name)
     {
@@ -64,20 +73,44 @@ struct ListBox : public Widget
     itom::Signal<std::vector<int>> selection_changed_;
 };
 
+/*
+* Dummy class not extending the Disconnector class
+*/
+class NotDisconnector
+{
+
+};
+
 int main()
 {
     // create some dummy objects
     ListBox* listbox = new ListBox("MyListBox");
-    Widget* w = new Widget("SomeWidget");
+    Widget* widget = new Widget("SomeWidget");
+    NotDisconnector* not_disconnector = new NotDisconnector();
 
-    // test the signal disconnection upon w's destruction
-    listbox->focus_in_.Connect([w]() {
-        std::cout << "ERROR in widget" << w->GetName() << "\n"; },
-        w // w's dtor makes this slot to be disconnected
+    // this would not compile - Connect() expects class inheriting
+    // from the Disconnector class
+    //listbox->focus_in_.Connect(
+    //    &Widget::PrintName,
+    //    not_disconnector // w's dtor makes this slot to be disconnected
+    //);
+
+    // test the disconnection upon w's destruction
+    // with non-static member function pointer
+    listbox->focus_in_.Connect(
+        &Widget::PrintName,
+        widget // w's dtor makes this slot to be disconnected
+    );
+
+    // with lambda
+    listbox->focus_in_.Connect([widget]() {
+        std::cout << widget->GetName() << " non-member\n"; },
+        widget // w's dtor makes this slot to be disconnected
     );
 
     // itom::Disconnector's virtual dtor terminates the above created connection
-    delete w;
+    delete widget;
+    delete not_disconnector;
 
     size_t discon_slot_id = listbox->focus_in_.Connect([]() {
         std::cout << "don't print this\n";
