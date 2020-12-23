@@ -35,12 +35,12 @@ public:
         
     }
 
-    size_t GetSlotID() const
+    constexpr size_t GetSlotID() const
     {
         return slot_id_;
     }
 
-    ISignal& GetSignal() const
+    constexpr ISignal& GetSignal() const
     {
         return signal_;
     }
@@ -89,9 +89,10 @@ public:
 
 private:
 
-    void AddConnection(const WeakPtrConnection& connection)
+    template <typename WPTRC>
+    void AddConnection(WPTRC&& connection)
     {
-        connections_.push_back(connection);
+        connections_.push_back(std::forward<WPTRC>(connection));
     }
 
     // weak_ptr to connections - they may already be terminated
@@ -161,7 +162,7 @@ public:
 
     // emit the signal - call all the connected slots
     template <typename... EmitArgs>
-    void Emit(EmitArgs&&... args)
+    void Emit(EmitArgs&&... args) const
     {
         for (auto&& slot : slots_)
         {
