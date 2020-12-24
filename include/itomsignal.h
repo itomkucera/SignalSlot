@@ -194,9 +194,11 @@ private:
         // store the slot at the actual position
         slots_.emplace(actual_slot_id_, std::forward<S>(slot));
 
-        // store the connection, increase the slot ID counter
-        auto connection = std::make_shared<Connection>(actual_slot_id_++, *this);
-        connections_.emplace(actual_slot_id_++, connection);
+        // store the connection
+        auto connection = std::make_shared<Connection>(actual_slot_id_, *this);
+        connections_.emplace(actual_slot_id_, connection);
+
+        actual_slot_id_++;
 
         return connection;
     }
