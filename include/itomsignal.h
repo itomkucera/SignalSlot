@@ -163,6 +163,13 @@ public:
         }
     }
 
+    void DisconnectAll()
+    {
+        slots_.clear();
+        connections_.clear();
+        actual_slot_id_ = 0; // optionally reset the counter
+    }
+
 
 private:
 

@@ -140,6 +140,9 @@ int main()
     // test the container-param signal
     listbox->selection_changed_.Emit(std::vector<int>{ 0, 2, 99 });
 
+    listbox->selection_changed_.DisconnectAll();
+    listbox->selection_changed_.Emit(std::vector<int>{ 0, 2, 99 });
+
     delete listbox;
 
     std::cin.get();
