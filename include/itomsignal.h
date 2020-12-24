@@ -8,8 +8,9 @@
 #include <type_traits>
 #include <assert.h>
 
-// IMPLEMENTATION DETAILS
-namespace itom::detail
+
+// PUBLIC API
+namespace itom
 {
 
 /*
@@ -22,10 +23,10 @@ public:
     virtual void Disconnect(size_t slot_id) = 0;
 };
 
-/* 
+/*
 * Connection class carries information about the signal and
 * slot's position inside the signal
-*/ 
+*/
 class Connection final
 {
 public:
@@ -34,7 +35,12 @@ public:
         slot_id_{ slot_id },
         signal_{ signal }
     {
-        
+
+    }
+
+    void Disconnect()
+    {
+        signal_.Disconnect(slot_id_);
     }
 
     constexpr size_t GetSlotID() const
@@ -53,12 +59,6 @@ private:
     ISignal& signal_;
 };
 
-} // namespace itom::detail
-
-
-// PUBLIC API
-namespace itom
-{
 /*
 * If any class extends from Disconnector, all the connections
 * that depend on the instance of this class (this object was declared
@@ -67,7 +67,7 @@ namespace itom
 */
 class Disconnector
 {
-    using WeakPtrConnection = std::weak_ptr<detail::Connection>;
+    using WeakPtrConnection = std::weak_ptr<Connection>;
     using WeakPtrConnectionContainer = std::vector<WeakPtrConnection>;
 
 public:
@@ -84,7 +84,7 @@ public:
             // that are still active - prevents from a crash
             if (auto shared_con = weak_con.lock())
             {
-                shared_con->GetSignal().Disconnect(shared_con->GetSlotID());
+                shared_con->Disconnect();
             }
         }
     }
@@ -105,13 +105,12 @@ private:
 
 
 template <typename... Args>
-class Signal : public detail::ISignal
+class Signal : public ISignal
 {
     using SlotType = std::function<void(Args...)>;
     using SlotContainer = std::map<size_t, SlotType>;
 
-    using SharedPtrConnection = std::shared_ptr<detail::Connection>;
-    using SharedPtrConnectionContainer = std::vector<SharedPtrConnection>;
+    using ConnectionContainer = std::vector<std::shared_ptr<Connection>>;
 
 public:
 
@@ -151,7 +150,7 @@ public:
 
         // create a connection and pass it to the disconnector
         connections_.emplace_back(
-            std::make_shared<detail::Connection>(actual_slot_id_, *this));
+            std::make_shared<Connection>(actual_slot_id_, *this));
         disconnector->AddConnection(connections_.back());
 
         // store the slot and return its position
@@ -168,14 +167,6 @@ public:
             });
         }
 
-    }
-
-    // creates a connection with a reference to the disconnector
-    // and stores the slot inside the signal    
-    template <typename S, typename D>
-    size_t Connect(S&& slot, D& disconnector)
-    {
-        return Connect(std::forward<S>(slot), std::addressof(disconnector));
     }
 
     // emit the signal - call all the connected slots
@@ -196,7 +187,7 @@ private:
 
     // keep track of the connections to prevent the disconnector
     // from trying to terminate a non-existing connection
-    SharedPtrConnectionContainer connections_;
+    ConnectionContainer connections_;
 
     // connected slots
     SlotContainer slots_;
