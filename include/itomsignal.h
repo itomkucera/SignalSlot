@@ -4,7 +4,8 @@
 #include <functional>
 #include <map>
 
-// HIDDEN IMPLEMENTATION DETAILS
+/*************** IMPLEMENTATION DETAILS ***************/
+
 namespace itom::detail
 {
 
@@ -21,7 +22,10 @@ public:
 } // namespace itom::detail
 
 
-// PUBLIC API
+/*************** PUBLIC API ***************/
+
+#define EMIT //< makes emitting the signal more readable
+
 namespace itom
 {
 
@@ -59,11 +63,12 @@ private:
 */
 class Disconnector
 {
+    template <typename... Args>
+    friend class Signal;
+
     using ConnectionContainer = std::vector<std::weak_ptr<Connection>>;
 
 public:
-    template <typename... Args>
-    friend class Signal;
 
     Disconnector() = default;
 
@@ -154,7 +159,7 @@ public:
 
     // calls all the connected slots
     template <typename... EmitArgs>
-    void Emit(EmitArgs&&... args) const
+    void operator()(EmitArgs&&... args) const
     {
         for (auto&& slot : slots_)
         {
@@ -165,13 +170,13 @@ public:
         }
     }
 
+    // terminates all the connections, removes all the slots
     void DisconnectAll()
     {
         slots_.clear();
         connections_.clear();
         actual_slot_id_ = 0; // optionally reset the counter
     }
-
 
 private:
 
