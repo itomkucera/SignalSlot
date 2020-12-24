@@ -112,12 +112,16 @@ int main()
     delete widget;
     delete not_disconnector;
 
-    size_t discon_slot_id = listbox->focus_in_.Connect([]() {
+    auto connection = listbox->focus_in_.Connect([]() {
         std::cout << "don't print this\n";
     });
-    
-    // explicitly terminate a connection
-    listbox->focus_in_.Disconnect(discon_slot_id);
+
+    if (auto shared_connection = connection.lock())
+    {
+        // explicitly terminate a connection
+        shared_connection->Disconnect();
+    }
+
 
     // multiple connections to the same signal
     listbox->focus_in_.Connect([]() {
