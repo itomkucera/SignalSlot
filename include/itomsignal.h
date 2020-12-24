@@ -158,8 +158,10 @@ public:
     {
         for (auto&& slot : slots_)
         {
-            // TODO: empty function ???
-            slot.second(std::forward<EmitArgs>(args)...);
+            if (slot.second)
+            {
+                slot.second(std::forward<EmitArgs>(args)...);
+            }
         }
     }
 
