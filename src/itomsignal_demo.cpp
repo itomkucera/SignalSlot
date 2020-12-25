@@ -81,6 +81,11 @@ class NotDisconnector
 
 };
 
+void PrintName()
+{
+    std::cout << "asdf" << "\n";
+}
+
 int main()
 {
     // create some dummy objects

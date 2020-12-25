@@ -24,6 +24,8 @@ public:
 
 /*************** PUBLIC API ***************/
 
+// TODO: helpers for overloaded slot functors
+
 #define EMIT //< makes emitting the signal more readable
 
 namespace itom
@@ -118,40 +120,50 @@ public:
 
     Signal& operator=(Signal&&) noexcept = delete;
 
-
-    // creates a connection and returns it
+    // creates a connection
+    // slot - invocable with Args...
     template <typename S>
     std::weak_ptr<Connection> Connect(S&& slot)
     {
-        return CreateConnection(std::forward<S>(slot));
+        // store the slot at the actual position
+        slots_.emplace(actual_slot_id_, std::forward<S>(slot));
+
+        // store the connection
+        auto connection = std::make_shared<Connection>(actual_slot_id_, *this);
+        connections_.emplace(actual_slot_id_, connection);
+
+        actual_slot_id_++;
+
+        return connection;
     }
 
-    // creates a connection with a pointer to the disconnector
-    // and returns this connection
-    template <typename S,  typename D>
+    // slot - non-static member function of disconnector, invocable with Args...
+    // disconnector - inherits Disconnector
+    template <typename S, typename D>
     std::weak_ptr<Connection> Connect(S&& slot, D* disconnector,
-        typename std::enable_if<std::is_base_of<Disconnector, D>::value>::type* = nullptr)
+        typename std::enable_if_t<
+            std::is_base_of_v<Disconnector, D> &&
+            std::is_invocable_v<S, D, Args...>
+        >* = nullptr)
     {
+        return Connect([&](Args&&... args)
+            { (disconnector->*slot)(std::forward<Args>(args)...); },
+            disconnector);
+    }
+
+    // slot - invocable with Args...
+    // disconnector - inherits Disconnector
+    template <typename S>
+    std::weak_ptr<Connection> Connect(S&& slot, Disconnector* disconnector,
+        typename std::enable_if_t<std::is_invocable_v<S, Args...>>* = nullptr)
+    {
+        // terminate before the connection is created
         if (!disconnector)
         {
             return {};
         }
 
-        std::shared_ptr<Connection> connection;
-        if constexpr (std::is_invocable<decltype(slot)>::value)
-        {
-            // invocable by itself
-            connection = CreateConnection(std::forward<S>(slot));
-        }
-        else
-        {
-            // probably a non-static member function pointer - bind it
-            connection = CreateConnection([&](Args&&... args) {
-                (disconnector->*slot)(std::forward<Args>(args)...);
-            });
-        }
-
-        // pass the connection to the disconnector
+        auto connection = Connect(std::forward<S>(slot));
         disconnector->AddConnection(connection);
 
         return connection;
@@ -163,6 +175,7 @@ public:
     {
         for (auto&& slot : slots_)
         {
+            // callable target could have been destroyed after Connect()
             if (slot.second)
             {
                 slot.second(std::forward<EmitArgs>(args)...);
@@ -185,22 +198,6 @@ private:
     {
         slots_.erase(slot_id);
         connections_.erase(slot_id);
-    }
-
-    // stores the slot and returns the connection
-    template <typename S>
-    inline std::shared_ptr<Connection> CreateConnection(S&& slot)
-    {
-        // store the slot at the actual position
-        slots_.emplace(actual_slot_id_, std::forward<S>(slot));
-
-        // store the connection
-        auto connection = std::make_shared<Connection>(actual_slot_id_, *this);
-        connections_.emplace(actual_slot_id_, connection);
-
-        actual_slot_id_++;
-
-        return connection;
     }
 
     size_t actual_slot_id_ = 0; //< slot id counter
