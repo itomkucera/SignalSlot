@@ -5,10 +5,16 @@
 #include <map>
 
 /*************** IMPLEMENTATION DETAILS ***************/
+namespace itom
+{
+template <typename... Args>
+class Signal;
 
-namespace itom::detail
+namespace detail
 {
 #define ERROR_ID (size_t)-1
+
+
 
 /*
 * Signal's interface used as a "forward declaration"
@@ -21,7 +27,7 @@ public:
 };
 
 template <typename... Args>
-class SignalImpl final : public detail::ISignalImpl
+class SignalImpl final : public ISignalImpl
 {
     template <typename... Args>
     friend class Signal;
@@ -55,8 +61,6 @@ private:
 
 #define EMIT //< makes emitting the signal more readable
 
-namespace itom
-{
 
 /*
 * Represents the signal-slot connection
@@ -115,9 +119,9 @@ public:
 
 private:
 
-    void AddConnection(Connection&& connection)
+    inline void EmplaceConnection(size_t slot_id, std::weak_ptr<detail::ISignalImpl> signal)
     {
-        connections_.push_back(std::move(connection));
+        connections_.emplace_back(slot_id, signal);
     }
 
     ConnectionContainer connections_;
@@ -128,12 +132,12 @@ private:
 * Wrapper class for the signal
 */
 template <typename... Args>
-class Signal final
+class Signal
 {
 public:
 
     Signal() :
-        impl_{ std::make_shared<SignalImpl>() }
+        impl_{ std::make_shared<detail::SignalImpl<Args...>>() }
     {
 
     }
@@ -179,12 +183,12 @@ public:
     {
         if (disconnector)
         {
-            disconnector->AddConnection({ actual_slot_id_, impl_ });
+            disconnector->EmplaceConnection(actual_slot_id_, impl_);
 
             return Connect(std::forward<S>(slot));
         }
 
-        return { ERROR_ID, std::shared_ptr<detail::ISignal>() };
+        return { ERROR_ID, std::shared_ptr<detail::ISignalImpl>() };
     }
 
     // calls all the connected slots
@@ -210,8 +214,7 @@ public:
 
 private:
 
-    class SignalImpl;
-    std::shared_ptr<SignalImpl> impl_;
+    std::shared_ptr<detail::SignalImpl<Args...>> impl_;
 
     size_t actual_slot_id_ = 0;
 };
