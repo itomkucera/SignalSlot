@@ -8,15 +8,42 @@
 
 namespace itom::detail
 {
+#define ERROR_ID (size_t)-1
 
 /*
 * Signal's interface used as a "forward declaration"
 */
-class ISignal
+class ISignalImpl
 {
 public:
 
     virtual void Disconnect(size_t slot_id) = 0;
+};
+
+template <typename... Args>
+class SignalImpl final : public detail::ISignalImpl
+{
+    template <typename... Args>
+    friend class Signal;
+
+    using SlotContainer = std::map<size_t, std::function<void(Args...)>>;
+
+public:
+
+    SignalImpl() = default;
+
+    // terminates the connection with the specific id
+    void Disconnect(size_t slot_id) override
+    {
+        slots_.erase(slot_id);
+    }
+
+private:
+
+    // slots must be stored here - wrapper could be destroyed by another thread
+    // immediatelly after calling lock() inside the Connection -> would lead to crash
+    SlotContainer slots_;
+
 };
 
 } // namespace itom::detail
@@ -38,7 +65,7 @@ class Connection final
 {
 public:
 
-    Connection(size_t slot_id, detail::ISignal& signal) :
+    Connection(size_t slot_id, std::weak_ptr<detail::ISignalImpl> signal) :
         slot_id_{ slot_id },
         signal_{ signal }
     {
@@ -48,14 +75,17 @@ public:
     // terminates the connection, removes the slot from the signal
     void Disconnect()
     {
-        signal_.Disconnect(slot_id_);
+        if (auto shared_signal = signal_.lock())
+        {
+            shared_signal->Disconnect(slot_id_);
+        }
     }
 
 private:
 
     size_t slot_id_;
 
-    detail::ISignal& signal_;
+    std::weak_ptr<detail::ISignalImpl> signal_;
 };
 
 /*
@@ -68,7 +98,7 @@ class Disconnector
     template <typename... Args>
     friend class Signal;
 
-    using ConnectionContainer = std::vector<std::weak_ptr<Connection>>;
+    using ConnectionContainer = std::vector<Connection>;
 
 public:
 
@@ -77,40 +107,36 @@ public:
     virtual ~Disconnector()
     {
         // terminate all the connections
-        for (auto&& weak_connection : connections_)
+        for (auto&& connection : connections_)
         {
-            // that are still active - prevents from a crash
-            if (auto shared_connection = weak_connection.lock())
-            {
-                shared_connection->Disconnect();
-            }
+            connection.Disconnect();
         }
     }
 
 private:
 
-    template <typename WPTRC>
-    void AddConnection(WPTRC&& connection)
+    void AddConnection(Connection&& connection)
     {
-        connections_.push_back(std::forward<WPTRC>(connection));
+        connections_.push_back(std::move(connection));
     }
 
-    // weak_ptr to connections - they may already be terminated
-    // due to the signal desctruction
     ConnectionContainer connections_;
 };
 
 
-
+/*
+* Wrapper class for the signal
+*/
 template <typename... Args>
-class Signal final : public detail::ISignal
+class Signal final
 {
-    using SlotContainer = std::map<size_t, std::function<void(Args...)>>;
-    using ConnectionContainer = std::unordered_map<size_t, std::shared_ptr<Connection>>;
-
 public:
 
-    Signal() = default;
+    Signal() :
+        impl_{ std::make_shared<SignalImpl>() }
+    {
+
+    }
 
     Signal(const Signal&) = delete;
 
@@ -123,57 +149,49 @@ public:
     // creates a connection
     // slot - invocable with Args...
     template <typename S>
-    std::weak_ptr<Connection> Connect(S&& slot)
+    Connection Connect(S&& slot)
     {
         // store the slot at the actual position
-        slots_.emplace(actual_slot_id_, std::forward<S>(slot));
+        impl_->slots_.emplace(actual_slot_id_, std::forward<S>(slot));
 
-        // store the connection
-        auto connection = std::make_shared<Connection>(actual_slot_id_, *this);
-        connections_.emplace(actual_slot_id_, connection);
-
-        actual_slot_id_++;
-
-        return connection;
+        return { actual_slot_id_++, impl_ };
     }
 
     // slot - non-static member function of disconnector, invocable with Args...
     // disconnector - inherits Disconnector
     template <typename S, typename D>
-    std::weak_ptr<Connection> Connect(S&& slot, D* disconnector,
+    Connection Connect(S&& slot, D* disconnector,
         typename std::enable_if_t<
             std::is_base_of_v<Disconnector, D> &&
             std::is_invocable_v<S, D, Args...>
         >* = nullptr)
     {
-        return Connect([&](Args&&... args)
-            { (disconnector->*slot)(std::forward<Args>(args)...); },
+        return Connect([&](Args&&... args) {
+            (disconnector->*slot)(std::forward<Args>(args)...); },
             disconnector);
     }
 
     // slot - invocable with Args...
-    // disconnector - inherits Disconnector
+    // disconnector - Disconnector instance
     template <typename S>
-    std::weak_ptr<Connection> Connect(S&& slot, Disconnector* disconnector,
+    Connection Connect(S&& slot, Disconnector* disconnector,
         typename std::enable_if_t<std::is_invocable_v<S, Args...>>* = nullptr)
     {
-        // terminate before the connection is created
-        if (!disconnector)
+        if (disconnector)
         {
-            return {};
+            disconnector->AddConnection({ actual_slot_id_, impl_ });
+
+            return Connect(std::forward<S>(slot));
         }
 
-        auto connection = Connect(std::forward<S>(slot));
-        disconnector->AddConnection(connection);
-
-        return connection;
+        return { ERROR_ID, std::shared_ptr<detail::ISignal>() };
     }
 
     // calls all the connected slots
     template <typename... EmitArgs>
     void operator()(EmitArgs&&... args) const
     {
-        for (auto&& slot : slots_)
+        for (auto&& slot : impl_->slots_)
         {
             // callable target could have been destroyed after Connect()
             if (slot.second)
@@ -186,25 +204,16 @@ public:
     // terminates all the connections, removes all the slots
     void DisconnectAll()
     {
-        slots_.clear();
-        connections_.clear();
-        actual_slot_id_ = 0; // optionally reset the counter
+        impl_->slots_.clear();
+        // actual_slot_id_ = 0; // optionally reset the counter
     }
 
 private:
 
-    // terminates the connection with specific id
-    void Disconnect(size_t slot_id) override
-    {
-        slots_.erase(slot_id);
-        connections_.erase(slot_id);
-    }
+    class SignalImpl;
+    std::shared_ptr<SignalImpl> impl_;
 
-    size_t actual_slot_id_ = 0; //< slot id counter
-
-    ConnectionContainer connections_; //< ownership of the connections
-
-    SlotContainer slots_; //< stored std::functions
+    size_t actual_slot_id_ = 0;
 };
 
 } // namespace itom

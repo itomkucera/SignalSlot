@@ -121,11 +121,7 @@ int main()
         std::cout << "don't print this\n";
     });
 
-    if (auto shared_connection = connection.lock())
-    {
-        // explicitly terminate a connection
-        shared_connection->Disconnect();
-    }
+    connection.Disconnect();
 
 
     // multiple connections to the same signal
