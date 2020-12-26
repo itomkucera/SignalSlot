@@ -12,9 +12,6 @@ class Signal;
 
 namespace detail
 {
-#define ERROR_ID (size_t)-1
-
-
 
 /*
 * Signal's interface used as a "forward declaration"
@@ -65,7 +62,7 @@ private:
 
 // TODO: helpers for overloaded slot functors
 
-#define EMIT //< makes emitting the signal more readable
+#define EMIT std::invoke //< syntactic suggar for emitting the signal
 
 
 /*
@@ -205,7 +202,8 @@ public:
             return Connect(std::forward<S>(slot));
         }
 
-        return { ERROR_ID, std::shared_ptr<detail::ISignalImpl>() };
+        // return an invalid connection (empty signal)
+        return { (size_t)-1, std::shared_ptr<detail::ISignalImpl>() };
     }
 
     // calls all the connected slots
