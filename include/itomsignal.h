@@ -23,7 +23,8 @@ class ISignalImpl
 {
 public:
 
-    virtual void Disconnect(size_t slot_id) = 0;
+    virtual bool Disconnect(size_t slot_id) = 0;
+    virtual bool SlotExists(size_t slot_id) const = 0;
 };
 
 template <typename... Args>
@@ -39,9 +40,14 @@ public:
     SignalImpl() = default;
 
     // terminates the connection with the specific id
-    void Disconnect(size_t slot_id) override
+    bool Disconnect(size_t slot_id) override
     {
-        slots_.erase(slot_id);
+        return slots_.erase(slot_id);
+    }
+
+    bool SlotExists(size_t slot_id) const override
+    {
+        return slots_.find(slot_id) != slots_.end();
     }
 
 private:
@@ -77,18 +83,29 @@ public:
     }
 
     // terminates the connection, removes the slot from the signal
-    void Disconnect()
+    bool Disconnect()
     {
         if (auto shared_signal = signal_.lock())
         {
-            shared_signal->Disconnect(slot_id_);
+            return shared_signal->Disconnect(slot_id_);
         }
+
+        return false;
+    }
+
+    bool IsValid() const
+    {
+        if (auto shared_signal = signal_.lock())
+        {
+            return shared_signal->SlotExists(slot_id_);
+        }
+
+        return false;
     }
 
 private:
 
     size_t slot_id_;
-
     std::weak_ptr<detail::ISignalImpl> signal_;
 };
 

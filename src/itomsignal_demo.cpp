@@ -121,7 +121,8 @@ int main()
         std::cout << "don't print this\n";
     });
 
-    connection.Disconnect();
+    bool is_valid = connection.Disconnect(); // true
+    is_valid = connection.Disconnect(); // false
 
 
     // multiple connections to the same signal
