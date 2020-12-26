@@ -7,6 +7,7 @@
 /*************** IMPLEMENTATION DETAILS ***************/
 namespace itom
 {
+
 template <typename... Args>
 class Signal;
 
@@ -14,7 +15,7 @@ namespace detail
 {
 
 /*
-* Signal's interface used as a "forward declaration"
+* SignalImpl's interface used as a non-templated "forward declaration"
 */
 class ISignalImpl
 {
@@ -24,6 +25,10 @@ public:
     virtual bool SlotExists(size_t slot_id) const = 0;
 };
 
+/*
+* Signal's internal implementation - useful for managing the instances of
+* a single signal across other classes (Connection, Disconnector...)
+*/
 template <typename... Args>
 class SignalImpl final : public ISignalImpl
 {
@@ -36,7 +41,6 @@ public:
 
     SignalImpl() = default;
 
-    // terminates the connection with the specific id
     bool Disconnect(size_t slot_id) override
     {
         return slots_.erase(slot_id);
@@ -50,9 +54,8 @@ public:
 private:
 
     // slots must be stored here - wrapper could be destroyed by another thread
-    // immediatelly after calling lock() inside the Connection -> would lead to crash
+    // immediatelly after calling lock() inside the Connection -> possible crash
     SlotContainer slots_;
-
 };
 
 } // namespace itom::detail
@@ -80,6 +83,7 @@ public:
     }
 
     // terminates the connection, removes the slot from the signal
+    // false if the signal was destroyed or the slot has already been removed
     bool Disconnect()
     {
         if (auto shared_signal = signal_.lock())
@@ -90,6 +94,7 @@ public:
         return false;
     }
 
+    // checks if the slot is still stored inside the living signal instance
     bool IsValid() const
     {
         if (auto shared_signal = signal_.lock())
@@ -143,7 +148,7 @@ private:
 
 
 /*
-* Wrapper class for the signal
+* API wrapper class for the signal
 */
 template <typename... Args>
 class Signal
@@ -206,7 +211,7 @@ public:
         return { (size_t)-1, std::shared_ptr<detail::ISignalImpl>() };
     }
 
-    // calls all the connected slots
+    // invokes all the connected slots
     template <typename... EmitArgs>
     void operator()(EmitArgs&&... args) const
     {
@@ -220,17 +225,21 @@ public:
         }
     }
 
-    // terminates all the connections, removes all the slots
+    bool GetSlotCount() const
+    {
+        return impl_->slots_.size();
+    }
+
     void DisconnectAll()
     {
         impl_->slots_.clear();
-        // actual_slot_id_ = 0; // optionally reset the counter
+        // if we reset the ID counter here, it could have side-effects -
+        // e.g. the old ID is stored inside the user's Connection instance
     }
 
 private:
 
     std::shared_ptr<detail::SignalImpl<Args...>> impl_;
-
     size_t actual_slot_id_ = 0;
 };
 
