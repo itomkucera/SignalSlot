@@ -8,7 +8,7 @@
 /*
 * Dummy class extending the Disconnector class - see the ITSignals.h
 */
-class Widget : public itom::Disconnector
+class Widget : public itom::AutoTerminator
 {
 public:
 
@@ -34,7 +34,7 @@ public:
     // simple focus signal without a param
     itom::Signal<> focus_in_;
 
-protected:
+
 
     std::string name_;
 
@@ -103,11 +103,11 @@ int main()
     // test the disconnection upon w's destruction
     // with non-static member function pointer
     listbox->focus_in_.Connect(
-        &Widget::PrintName,
+        &ListBox::PrintName,
         widget // w's dtor makes this slot to be disconnected
     );
 
-    // with lambda
+    //// with lambda
     listbox->focus_in_.Connect([widget]() {
         std::cout << widget->GetName() << " non-member\n"; },
         widget // w's dtor makes this slot to be disconnected
@@ -121,8 +121,10 @@ int main()
         std::cout << "don't print this\n";
     });
 
-    bool is_valid = connection.Disconnect(); // true
-    is_valid = connection.Disconnect(); // false
+    bool terminated = connection.IsTerminated(); // false
+    connection.Terminate();
+    terminated = connection.IsTerminated(); // true
+    connection.Terminate(); // doesn't do anything
 
 
     // multiple connections to the same signal
@@ -142,7 +144,7 @@ int main()
     // test the container-param signal
     EMIT(listbox->selection_changed_, std::vector<int>{ 0, 2, 99 });
 
-    listbox->selection_changed_.DisconnectAll();
+    listbox->selection_changed_.TerminateAll();
     EMIT(listbox->selection_changed_, std::vector<int>{ 0, 2, 99 });
 
 
