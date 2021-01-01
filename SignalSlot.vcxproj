@@ -19,10 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\itomsignal.h" />
+    <ClInclude Include="include\itom\signals.h" />
+    <ClInclude Include="include\itom\signals\auto_terminator.h" />
+    <ClInclude Include="include\itom\signals\connection.h" />
+    <ClInclude Include="include\itom\signals\detail\internals.h" />
+    <ClInclude Include="include\itom\signals\signal.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\itomsignal_demo.cpp" />
+    <ClCompile Include="demo\itomsignal_demo.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
