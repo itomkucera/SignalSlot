@@ -1,10 +1,7 @@
 #ifndef __ITOM_SIGNALS_SIGNAL_H__
 #define __ITOM_SIGNALS_SIGNAL_H__
 
-#include "connection.h"
 #include "auto_terminator.h"
-
-#define EMIT std::invoke //< syntactic suggar for emitting the signal
 
 namespace itom
 {
@@ -35,11 +32,7 @@ public:
     template <typename S>
     Connection Connect(S&& function)
     {
-        // store the slot at the actual position
-        impl_->slots_.emplace_back(
-            std::make_shared<detail::Slot<Args...>>(std::forward<S>(function)));
-
-        return Connection(impl_->slots_.back(), impl_);
+        return { impl_->Connect(std::forward<S>(function)), impl_ };
     }
 
     // function - non-static member function of disconnector, invocable with Args...
@@ -66,40 +59,29 @@ public:
     {
         if (terminator)
         {
-            // store the slot at the actual position
-            impl_->slots_.emplace_back(
-                std::make_shared<detail::Slot<Args...>>(std::forward<S>(function)));
-            terminator->EmplaceConnection(impl_->slots_.back(), impl_);
-
-            return Connection(impl_->slots_.back(), impl_);
+            // TODO: terminator could be destroyed here by another thread
+            auto slot = impl_->Connect(std::forward<S>(function));
+            terminator->EmplaceConnection(slot, impl_);
+            return { std::move(slot), impl_ };
         }
-
-        // return an invalid connection (empty signal, empty slot)
         return {};
     }
 
     // invokes all the connected slots
     template <typename... EmitArgs>
-    void operator()(EmitArgs&&... args) const
+    void Emit(EmitArgs&&... args) const
     {
-        for (auto&& slot : impl_->slots_)
-        {
-            // callable target could have been destroyed after Connect()
-            if (slot->slot_ && slot->active_)
-            {
-                (slot->slot_)(std::forward<EmitArgs>(args)...);
-            }
-        }
+        impl_->Emit(std::forward<EmitArgs>(args)...);
     }
 
     bool GetSlotCount() const
     {
-        return impl_->slots_.size();
+        return impl_->GetSlotCount();
     }
 
     void TerminateAll()
     {
-        impl_->slots_.clear();
+        impl_->TerminateAll();
     }
 
 private:

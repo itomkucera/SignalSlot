@@ -135,17 +135,17 @@ int main()
     // this should execute 2 slots - 4 were connected
     // 1 was disconnected automatically (by Disconnector's dtor)
     // 1 was disconnected explicitly using Signal::Disconnect()
-    EMIT(listbox->focus_in_);
+    listbox->focus_in_.Emit();
 
     // test the multi-param signal one of which is an lvalue
     constexpr int index = 3;
-    EMIT(listbox->item_text_changed_, index, "NewItem3");
+    listbox->item_text_changed_.Emit(index, "NewItem3");
 
     // test the container-param signal
-    EMIT(listbox->selection_changed_, std::vector<int>{ 0, 2, 99 });
+    listbox->selection_changed_.Emit(std::vector<int>{ 0, 2, 99 });
 
     listbox->selection_changed_.TerminateAll();
-    EMIT(listbox->selection_changed_, std::vector<int>{ 0, 2, 99 });
+    listbox->selection_changed_.Emit(std::vector<int>{ 0, 2, 99 });
 
 
     delete listbox;

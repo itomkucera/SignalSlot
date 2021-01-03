@@ -10,6 +10,9 @@ namespace itom
 template <typename... Args>
 class Signal;
 
+class Connection;
+class AutoTerminator;
+
 namespace detail
 {
 
@@ -53,12 +56,32 @@ public:
 template <typename... Args>
 class SignalImpl final : public ISignalImpl
 {
-    template <typename... Args>
-    friend class Signal;
-
     using SlotContainer = std::list<std::shared_ptr<Slot<Args...>>>;
 
 public:
+
+    // function - invocable with Args...
+    template <typename S>
+    std::weak_ptr<detail::Slot<Args...>> Connect(S&& function)
+    {
+        // store the slot at the actual position
+        return slots_.emplace_back(
+            std::make_shared<detail::Slot<Args...>>(std::forward<S>(function)));
+    }
+
+    // invokes all the connected slots
+    template <typename... EmitArgs>
+    void Emit(EmitArgs&&... args) const
+    {
+        for (auto&& slot : slots_)
+        {
+            // callable target could have been destroyed after Connect()
+            if (slot->slot_ && slot->active_)
+            {
+                (slot->slot_)(std::forward<EmitArgs>(args)...);
+            }
+        }
+    }
 
     void Terminate(ISlot* slot) override
     {
@@ -67,11 +90,15 @@ public:
             slots_.end());
     }
 
-    /*bool SlotExists(ISlot* slot) const override
+    bool GetSlotCount() const
     {
-        return std::any_of(slots_.begin(), slots_.end(),
-            [slot](const auto& shared_slot) { return shared_slot.get() == slot; });
-    }*/
+        return slots_.size();
+    }
+
+    void TerminateAll()
+    {
+        slots_.clear();
+    }
 
 private:
 
