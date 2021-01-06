@@ -1,7 +1,6 @@
 #ifndef __ITOM_SIGNALS_CONNECTION_H__
 #define __ITOM_SIGNALS_CONNECTION_H__
 
-#include <memory>
 #include "detail/internals.h"
 
 namespace itom
@@ -13,16 +12,17 @@ namespace itom
 
 class Connection
 {
+    template <typename... Args>
+    friend class Signal;
+
+    friend class AutoTerminator;
+
+    using SlotType = std::weak_ptr<detail::ISlot>;
+    using SignalType = std::weak_ptr<detail::ISignalImpl>;
+
 public:
 
     Connection() = default;
-
-    Connection(std::weak_ptr<detail::ISlot> slot, std::weak_ptr<detail::ISignalImpl> signal) :
-        slot_{ std::move(slot) },
-        signal_{ std::move(signal) }
-    {
-
-    }
 
     // terminates the connection, removes the slot from the signal
     // false if the signal was destroyed or the slot has already been removed
@@ -63,8 +63,15 @@ public:
 
 private:
 
-    std::weak_ptr<detail::ISlot> slot_;
-    std::weak_ptr<detail::ISignalImpl> signal_;
+    Connection(SlotType&& slot, SignalType&& signal) :
+        slot_{ std::move(slot) },
+        signal_{ std::move(signal) }
+    {
+
+    }
+
+    SlotType slot_;
+    SignalType signal_;
 };
 
 } // namespace itom

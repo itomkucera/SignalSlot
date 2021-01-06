@@ -41,8 +41,7 @@ public:
     Connection Connect(S&& function, D* terminator,
         typename std::enable_if_t<
         std::is_base_of_v<AutoTerminator, D> &&
-        std::is_invocable_v<S, D, Args...>
-        >* = nullptr)
+        std::is_invocable_v<S, D, Args...>>* = nullptr)
     {
         // capture by value - slot should always be a pointer
         // void(D::*f)(Args...) doesn't expect const - another overload would be needed
@@ -61,7 +60,7 @@ public:
         {
             // TODO: terminator could be destroyed here by another thread
             auto slot = impl_->Connect(std::forward<S>(function));
-            terminator->EmplaceConnection(slot, impl_);
+            terminator->AddConnection(Connection{ slot, impl_ });
             return { std::move(slot), impl_ };
         }
         return {};
@@ -71,6 +70,10 @@ public:
     template <typename... EmitArgs>
     void Emit(EmitArgs&&... args) const
     {
+        static_assert(
+            (std::is_convertible_v<EmitArgs, Args> && ...),
+            "Parameter types don't match.");
+
         impl_->Emit(std::forward<EmitArgs>(args)...);
     }
 

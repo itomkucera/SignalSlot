@@ -4,24 +4,14 @@
 #include <functional>
 #include <algorithm>
 
-namespace itom
-{
-
-template <typename... Args>
-class Signal;
-
-class Connection;
-class AutoTerminator;
-
-namespace detail
+namespace itom::detail
 {
 
 class ISlot
 {
 public:
 
-    bool active_ = true;
-
+    bool active_{ true };
 };
 
 template <typename... Args>
@@ -75,7 +65,6 @@ public:
     {
         for (auto&& slot : slots_)
         {
-            // callable target could have been destroyed after Connect()
             if (slot->slot_ && slot->active_)
             {
                 (slot->slot_)(std::forward<EmitArgs>(args)...);
@@ -107,8 +96,6 @@ private:
     SlotContainer slots_;
 };
 
-} // namespace detail
-
-} // namespace itom
+} // namespace itom::detail
 
 #endif // __ITOM_SIGNALS_DETAIL_SLOT_H__

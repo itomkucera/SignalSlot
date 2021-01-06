@@ -1,7 +1,6 @@
 #ifndef __ITOM_SIGNALS_AUTOTERMINATOR_H__
 #define __ITOM_SIGNALS_AUTOTERMINATOR_H__
 
-#include  <list>
 #include "connection.h"
 
 namespace itom
@@ -17,7 +16,7 @@ class AutoTerminator
     template <typename... Args>
     friend class Signal;
 
-    using ConnectionContainer = std::list<Connection>;
+    using ConnectionContainer = std::vector<Connection>;
 
 public:
 
@@ -43,10 +42,10 @@ public:
 
 private:
 
-    template <typename... Args>
-    void EmplaceConnection(Args&&... args)
+    template <typename C>
+    void AddConnection(C&& connection)
     {
-        connections_.emplace_back(std::forward<Args>(args)...);
+        connections_.push_back(std::forward<C>(connection));
     }
 
     ConnectionContainer connections_;
