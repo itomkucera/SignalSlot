@@ -1,10 +1,10 @@
-#include "gtest/gtest.h"
+#include <itom/signals.h>
 
+#include <any>
 #include <string>
 #include <vector>
-#include <any>
 
-#include <itom/signals.h>
+#include "gtest/gtest.h"
 
 std::any param_tester;
 
@@ -45,12 +45,11 @@ class ListBox : public Widget {
 class WidgetTestCase : public ::testing::Test {
    protected:
     void SetUp() override {
-        focus_in_connection_ = listbox_->focus_in_.Connect(&ListBox::ChangeName, listbox_.get());
+        focus_in_connection_ =
+            listbox_->focus_in_.Connect(&ListBox::ChangeName, listbox_.get());
     }
 
-    void TearDown() override {
-
-    }
+    void TearDown() override {}
 
     itom::Connection focus_in_connection_;
     std::unique_ptr<Widget> widget_{std::make_unique<Widget>("widget")};
